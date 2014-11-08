@@ -13,9 +13,11 @@ $RECYCLE.BIN/
 *.msi
 *.msm
 *.msp
+
 **/scene
 scene*
-
+*.png
+**/png
 # =========================
 # Operating System Files
 # =========================
