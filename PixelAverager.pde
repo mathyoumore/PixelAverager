@@ -23,8 +23,10 @@ Convert current drawing page to PGraphic style thing
 
 PImage mrk; 
 PGraphics hMean, vMean, gMean, gMax, gMin;
-int frame = 280; //Starting frame value
-float maxFrame = 6279; //73506 //Numerical value of highest frame
+GifMaker gMeanGif, gMaxGif, gMinGif;
+
+int frame = 5300; //Starting frame value
+float maxFrame = 5363; //73506 //Numerical value of highest frame
 float infidelity = 1; //Skipped frames, change with great care
 
 int fts = ceil(maxFrame/infidelity) - ceil(frame/infidelity); //Frames to scan
@@ -39,10 +41,13 @@ float t=0;
 
 boolean doHorizontalMean = false; 
 boolean doVerticalMean = false; 
-boolean doGlobalMean = false;
+boolean doGlobalMean = true;
 boolean doGlobalMaximum = true;
 boolean doGlobalMinimum = true;
 boolean showProgress = true;
+boolean doGlobalMinimumGif = true;
+boolean doGlobalMeanGif = true;
+boolean doGlobalMaximumGif = false;
 
 int status = 0; 
 void setup() {
@@ -57,9 +62,16 @@ void setup() {
   gMean = createGraphics(fw, fh);
   gMax = createGraphics(fw, fh);
   gMin = createGraphics(fw, fh);
-  size(400, 80);
+  gMinGif = new GifMaker(this, "gMin.gif");
+  gMeanGif = new GifMaker(this, "gMean.gif");
+  gMaxGif = new GifMaker(this, "gMax.gif");
+  gMinGif.setRepeat(0);
+  gMeanGif.setRepeat(0);
+  gMaxGif.setRepeat(0);
+  size(fw, fh);
   rectMode(CORNERS);
   noStroke();
+  frameRate(24);
 }
 
 void draw() {
@@ -164,68 +176,123 @@ void draw() {
           }
           if (doGlobalMean)
           {
-            globalMean(p);
+            addColorForMean(p);
+            if (p % 100 == 0) { 
+              println(rS[p]);
+            }
           }
         }
       }
-    }
+      //GIFs
 
-
-
-    frame+=infidelity;
-  } else 
-  {
-    if (doVerticalMean)
-    {
-      vMean.save("newerv.png");
-      vMean.endDraw();
-    }
-    if (doHorizontalMean)
-    {
-      hMean.save("newh.png");
-      hMean.endDraw();
-    }
-
-    if (doGlobalMean)
-    {
-      gMean.beginDraw();
-      for (int p = 0; p < fw * fh; p++)
+      if (doGlobalMinimumGif || doGlobalMeanGif || doGlobalMaximumGif)
       {
-        rS[p] = floor(rS[p]/fts);
-        gS[p] = floor(gS[p]/fts);
-        bS[p] = floor(bS[p]/fts);
-        gMean.set(p % fw, p / fw, color(rS[p], gS[p], bS[p]));
+        if (doGlobalMinimumGif)
+        {
+          scanCopy(gMin);
+          gMinGif.setDelay(42);
+          gMinGif.addFrame();
+        }
+        clear();
+        if (doGlobalMeanGif)
+        {
+          for (int p = 0; p < fw * fh; p++)
+          {
+            set(p % fw, p / fw, getColorMean(color(rS[p], gS[p], bS[p]), floor(frame-startFrame)));
+            if (p % 100 == 0) { 
+              println(red(get(p % fw, p / fw)));
+              println("Should be " + rS[p] + " / " + (frame-startFrame) + " = " + (rS[p]/(frame-startFrame)));
+            }
+          }
+          gMeanGif.setDelay(42);
+          gMeanGif.addFrame();
+        }
+        clear();
+        if (doGlobalMaximumGif)
+        {
+          scanCopy(gMax);
+          gMaxGif.setDelay(42);
+          gMaxGif.addFrame();
+        }
+        clear();
       }
 
-      gMean.save("newg.png");
-      gMean.endDraw();
+      frame+=infidelity;
+    } else 
+    {
+      if (doVerticalMean)
+      {
+        vMean.save("newerv.png");
+        vMean.endDraw();
+      }
+      if (doHorizontalMean)
+      {
+        hMean.save("newh.png");
+        hMean.endDraw();
+      }
 
+      if (doGlobalMean)
+      {
+        gMean.beginDraw();
+        for (int p = 0; p < fw * fh; p++)
+        {
+          gMean.set(p % fw, p / fw, getColorMean(color(rS[p], gS[p], bS[p]), fts));
+        }
+
+        gMean.save("newg.png");
+        gMean.endDraw();
+      }
+
+      if (doGlobalMaximum)
+      {
+        gMax.save("newmax.png");
+        gMax.endDraw();
+      }
+      if (doGlobalMinimum)
+      {
+        gMin.save("newmin.png");
+        gMin.endDraw();
+      }
+
+      if (doGlobalMaximumGif)
+      {
+        gMaxGif.finish();
+      }
+      if (doGlobalMeanGif)
+      {
+        gMeanGif.finish();
+      }
+      if (doGlobalMinimumGif)
+      {
+        gMinGif.finish();
+      }
+
+
+
+      println((millis()-t)/1000.0 + " seconds");
       noLoop();
     }
-
-    if (doGlobalMaximum)
-    {
-      gMax.save("newmax.png");
-      gMax.endDraw();
-    }
-    if (doGlobalMinimum)
-    {
-      gMin.save("newmin.png");
-      gMin.endDraw();
-    }
-
-
-
-    println((millis()-t)/1000.0 + " seconds");
-    noLoop();
   }
 }
 
-void globalMean(int p)
+void scanCopy (PGraphics from)
+{
+  for (int px = 0; px < fh * fw; px++)
+  {
+    set(px % fw, px / fw, from.get(px % fw, px / fw));
+  }
+}
+
+void addColorForMean (int p)
 {
   rS[p] += red(mrk.pixels[p]);
   gS[p] += green(mrk.pixels[p]);
   bS[p] += blue(mrk.pixels[p]);
+}
+
+color getColorMean(color c, int f)
+{
+  return color(red(c)/f, green(c)/f, blue(c)/f);
 }
 
 int getColorSum(color c)
