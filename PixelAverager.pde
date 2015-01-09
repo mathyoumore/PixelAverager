@@ -1,3 +1,5 @@
+import gifAnimation.*;
+
 //Authored by Mathyoumore
 
 //To do
@@ -12,21 +14,21 @@ Convert current drawing page to PGraphic style thing
  - Variance
  - Standard Deviation (sqrt(Variance))
  - verbosePixel data type: 
-  -- Color
-  -- Color Properties? (Test for speed) 
-  -- True position
-  -- Relative position?
+ -- Color
+ -- Color Properties? (Test for speed) 
+ -- True position
+ -- Relative position?
  - GUI
  */
 
 PImage mrk; 
-PGraphics hMean, vMean, gMean;
-int frame = 29633; //28633
-float maxFrame = 36686; //73506 //Numerical value of highest frame
+PGraphics hMean, vMean, gMean, gMax, gMin;
+int frame = 280; //Starting frame value
+float maxFrame = 6279; //73506 //Numerical value of highest frame
 float infidelity = 1; //Skipped frames, change with great care
 
 int fts = ceil(maxFrame/infidelity) - ceil(frame/infidelity); //Frames to scan
-String loc = "";
+String loc = ""; // 
 String im = loc + "scene" + frame + ".png";
 int fw;
 int fh; 
@@ -35,9 +37,12 @@ float startFrame = frame;
 int[] rS, gS, bS; //Holds the summed r,g,and b values for global mean
 float t=0;
 
-boolean doH = true; 
-boolean doV = true; 
-boolean doG = true;
+boolean doHorizontalMean = false; 
+boolean doVerticalMean = false; 
+boolean doGlobalMean = false;
+boolean doGlobalMaximum = true;
+boolean doGlobalMinimum = true;
+boolean showProgress = true;
 
 int status = 0; 
 void setup() {
@@ -50,6 +55,8 @@ void setup() {
   hMean = createGraphics(fts, fh);
   vMean = createGraphics(fw, fts);
   gMean = createGraphics(fw, fh);
+  gMax = createGraphics(fw, fh);
+  gMin = createGraphics(fw, fh);
   size(400, 80);
   rectMode(CORNERS);
   noStroke();
@@ -58,30 +65,24 @@ void setup() {
 void draw() {
   if (frame < maxFrame)
   {
-
-    if (frame == startFrame)
+    if (showProgress)
     {
-      t = millis();
+      if (frame == startFrame)
+      {
+        t = millis();
+      }
+      if (frame % 30 == 0 && (frame-startFrame) > 0)
+      {
+        float mpf = millis()/(frame-startFrame);
+        println(floor(frame-startFrame) + " of " + fts + " Frames processed. " + mpf + " millis per frame." +
+          "\n" + floor(((maxFrame-frame) * mpf)/(1000*360)) + " hours " + 
+          floor(((maxFrame-frame) * mpf)/(1000*60)) + " minutes " + 
+          floor(((maxFrame-frame) * mpf)%(60)) + " seconds remaining.");
+      }
+      //Progress bar
+      fill(0, 200, 0);
+      rect(0, 0, ((frame-startFrame)/fts)*width, height);
     }
-
-    if (frame % 30 == 0 && (frame-startFrame) > 0)
-    {
-      float mpf = millis()/(frame-startFrame);
-      println(floor(frame-startFrame) + " of " + fts + " Frames processed. " + mpf + " millis per frame." +
-        "\n" + floor(((maxFrame-frame) * mpf)/(1000*360)) + " hours " + 
-        floor(((maxFrame-frame) * mpf)/(1000*60)) + " minutes " + 
-        floor(((maxFrame-frame) * mpf)%(60)) + " seconds remaining.");
-    }
-
-    //Progress bar
-    fill(0, 200, 0);
-    rect(0, 0, ((frame-startFrame)/fts)*width, height);
-
-    hMean.beginDraw();
-    vMean.beginDraw();
-
-    hMean.noStroke();
-    vMean.noStroke();
 
     color c = 0;
 
@@ -105,44 +106,87 @@ void draw() {
     {//Is the image a valid image
       mrk.loadPixels();
       //println(fw + " x " + fw);      
-      if (doV)
+      if (doVerticalMean)
       {
+        if (frame == startFrame)
+        {
+          hMean.beginDraw();
+        }
         for (int x = 1; x<fw; x++)
         {
-          c = vertPixelsMean(x);
-          vMean.fill(c);
-          vMean.rect(x, (frame/infidelity)-(startFrame/infidelity), x+1, (frame/infidelity)-(startFrame/infidelity)+1);
+          vMean.set(x, floor((frame/infidelity)-(startFrame/infidelity)), vertPixelsMean(x));
         }
       }
 
-      if (doH)
+      if (doHorizontalMean)
       {
+        if (frame == startFrame)
+        {
+          vMean.beginDraw();
+        }
         for (int y = 1; y<fh; y++)
         {
-          c = horzPixelsMean(y);
-          hMean.fill(c);
-          hMean.rect(frame/infidelity-(startFrame/infidelity), y, frame/infidelity-(startFrame/infidelity)+1, y+1);
+          hMean.set(y, floor(frame/infidelity-(startFrame/infidelity)), horzPixelsMean(y));
         }
       }
-
-      if (doG)
+      if (doGlobalMean || doGlobalMaximum || doGlobalMinimum)
       {
         for (int p = 0; p < fw*fh; p++)
         {
-          globalMean(p);
+          if (doGlobalMaximum)
+          {
+            if (frame == floor(startFrame) + 1)
+            {
+              if (floor(p) == 0)
+              {
+                gMax.beginDraw();
+              }
+              gMax.set(p % fw, p / fw, mrk.pixels[p]);
+            } else if (getColorSum(mrk.pixels[p]) > getColorSum(gMax.get(p % fw, p / fw)))
+            {
+              gMax.set(p % fw, p / fw, mrk.pixels[p]);
+            }
+          }
+          if (doGlobalMinimum)
+          {
+            if (frame == floor(startFrame) + 1)
+            {
+              if (p == 0)
+              {
+
+                gMin.beginDraw();
+              }
+              gMin.set(p % fw, p / fw, mrk.pixels[p]);
+            } else if (getColorSum(mrk.pixels[p]) < getColorSum(gMin.get(p % fw, p / fw)))
+            {
+              gMin.set(p % fw, p / fw, mrk.pixels[p]);
+            }
+          }
+          if (doGlobalMean)
+          {
+            globalMean(p);
+          }
         }
       }
     }
 
+
+
     frame+=infidelity;
   } else 
   {
-    vMean.save("newv.png");
-    hMean.save("newh.png");
-    vMean.endDraw();
-    hMean.endDraw();
+    if (doVerticalMean)
+    {
+      vMean.save("newerv.png");
+      vMean.endDraw();
+    }
+    if (doHorizontalMean)
+    {
+      hMean.save("newh.png");
+      hMean.endDraw();
+    }
 
-    if (doG)
+    if (doGlobalMean)
     {
       gMean.beginDraw();
       for (int p = 0; p < fw * fh; p++)
@@ -155,7 +199,23 @@ void draw() {
 
       gMean.save("newg.png");
       gMean.endDraw();
+
+      noLoop();
     }
+
+    if (doGlobalMaximum)
+    {
+      gMax.save("newmax.png");
+      gMax.endDraw();
+    }
+    if (doGlobalMinimum)
+    {
+      gMin.save("newmin.png");
+      gMin.endDraw();
+    }
+
+
+
     println((millis()-t)/1000.0 + " seconds");
     noLoop();
   }
@@ -166,6 +226,11 @@ void globalMean(int p)
   rS[p] += red(mrk.pixels[p]);
   gS[p] += green(mrk.pixels[p]);
   bS[p] += blue(mrk.pixels[p]);
+}
+
+int getColorSum(color c)
+{
+  return floor(red(c)+green(c)+blue(c));
 }
 
 color vertPixelsMean(int offset)
